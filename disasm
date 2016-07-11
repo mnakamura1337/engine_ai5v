@@ -1,0 +1,54 @@
+#!/usr/bin/env ruby
+
+require 'pp'
+
+require_relative 'elf_mes'
+
+class Disassembler
+  def initialize(fn)
+    @mes = ElfMes.from_file(fn)
+    @mes._read
+    @str = ''
+  end
+
+  def run
+    @mes.ops.each { |op|
+      addr = op._debug['opcode'][:start]
+      if op.opcode >= 0x80 and op.str_char1
+        @str << op.str_char1.encode('UTF-8')
+      elsif op.next_std_char
+        a = [op.opcode + 0x20, op.next_std_char].pack('C*')
+        begin
+          @str << a.force_encoding('SJIS').encode('UTF-8')
+        rescue Encoding::InvalidByteSequenceError
+          @str << '?'
+        rescue Encoding::UndefinedConversionError
+          @str << '?'
+        end
+      else
+        dump_str
+        printf "%08x: ", addr
+        sym = ElfMes::Op::OPCODES[op.opcode]
+        op.instance_variable_set('@opcode', sym) if sym
+        pp op
+      end
+    }
+    dump_str
+  end
+
+  def dump_str
+    unless @str.empty?
+      p @str
+      @str = ''
+    end
+  end
+end
+
+if ARGV.size == 0
+  puts "Usage: disasm [file.MES]..."
+  exit 1
+end
+
+ARGV.each { |fn|
+  Disassembler.new(fn).run
+}
