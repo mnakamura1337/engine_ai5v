@@ -32,9 +32,21 @@ types:
       - id: op6
         type: op6
         if: opcode == 6
+      - id: op_save_const
+        type: op_save_const
+        if: opcode == 0xa
+      - id: op_save_expr
+        type: op_save_expr
+        if: opcode == 0xb
       - id: op_make_array
         type: op_make_array
         if: opcode == 0xd
+      - id: op_call_proc
+        type: op_call_proc
+        if: opcode == 0x13
+      - id: op_call
+        type: op_call
+        if: opcode == 0x14
     instances:
       str_char1:
         value: '_root.chars.entries[opcode - 0x80]'
@@ -102,6 +114,20 @@ types:
         type: strz
         encoding: SJIS
         terminator: 6
+  op_save_const:
+    seq:
+      - id: const_idx
+        type: const
+      - id: elements
+        type: expr
+        # TODO: elements may be repeated, additional ones can be supplied separated with 0x2
+  op_save_expr:
+    seq:
+      - id: expr_id
+        type: expr
+      - id: elements
+        type: expr
+        # TODO: elements may be repeated, additional ones can be supplied separated with 0x2
   op_make_array:
     seq:
       - id: base_idx
@@ -111,6 +137,14 @@ types:
       - id: elements
         type: expr
         # TODO: elements may be repeated, additional ones can be supplied separated with 0x2
+  op_call_proc:
+    seq:
+      - id: proc_idx
+        type: param
+  op_call:
+    seq:
+      - id: offset
+        type: param
   expr:
     seq:
       - id: opcodes
@@ -120,9 +154,31 @@ types:
         # TODO: proper expression parsing
   param:
     seq:
-      - id: typ
+      - id: code
         type: u1
       - id: str
         type: op6
-        if: typ == 6
-      # TODO: type == 1
+        if: code == 6
+      # TODO: code == 1
+      - id: b1
+        type: u1
+        if: code == 7 or code == 8 or code == 9
+      - id: b2
+        type: u1
+        if: code == 8 or code == 9
+      - id: b3
+        type: u1
+        if: code == 9
+  const:
+    seq:
+      - id: code
+        type: u1
+      - id: b1
+        type: u1
+        if: code == 7 or code == 8 or code == 9
+      - id: b2
+        type: u1
+        if: code == 8 or code == 9
+      - id: b3
+        type: u1
+        if: code == 9
