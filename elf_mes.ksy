@@ -38,6 +38,9 @@ types:
       - id: op_save_expr
         type: op_save_expr
         if: opcode == 0xb
+      - id: op_set_base_var
+        type: op_set_base_var
+        if: opcode == 0xc
       - id: op_make_array
         type: op_make_array
         if: opcode == 0xd
@@ -128,6 +131,12 @@ types:
       - id: elements
         type: expr
         # TODO: elements may be repeated, additional ones can be supplied separated with 0x2
+  op_set_base_var:
+    seq:
+      - id: base_idx
+        type: u1
+      - id: base
+        type: expr
   op_make_array:
     seq:
       - id: base_idx
