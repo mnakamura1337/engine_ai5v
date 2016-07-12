@@ -44,6 +44,9 @@ types:
       - id: op_make_array
         type: op_make_array
         if: opcode == 0xd
+      - id: op_if
+        type: op_if
+        if: opcode == 0xf
       - id: op_call_proc
         type: op_call_proc
         if: opcode == 0x13
@@ -83,8 +86,11 @@ types:
         type: u1
         enum: opcodes
       - id: param
-        if: opcode == opcodes::jump_script or opcode == opcodes::load_image or opcode == opcodes::load_file or opcode == opcodes::palette
+        if: opcode == opcodes::jump_script or opcode == opcodes::load_image or opcode == opcodes::palette
         type: param
+      - id: op4_load_file
+        type: op4_load_file
+        if: opcode == opcodes::load_file
     enums:
       opcodes:
         0x10: while
@@ -146,6 +152,11 @@ types:
       - id: elements
         type: expr
         # TODO: elements may be repeated, additional ones can be supplied separated with 0x2
+  op_if:
+    seq:
+      - id: cond
+        type: expr
+      # TODO: rest of if
   op_call_proc:
     seq:
       - id: proc_idx
@@ -154,6 +165,14 @@ types:
     seq:
       - id: offset
         type: param
+  op4_load_file:
+    seq:
+      - id: filename
+        type: param
+      - id: comma
+        contents: [2]
+      - id: param2
+        type: expr
   expr:
     seq:
       - id: opcodes
