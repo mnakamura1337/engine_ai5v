@@ -71,14 +71,15 @@ class Decompiler
           print ', '
         elsif sym == :opcodes_begin
           print ' {'
-          @indent += 1 if sym == :opcodes_begin    
+          @indent += 1 if sym == :opcodes_begin
+        elsif sym == :opcodes_end
+          @indent -= 1 if sym == :opcodes_end
+          @indent = 0 if @indent < 0          
+          print_line '}'
         else
           st = dump_stack
           print " #{st} !!!" unless st.nil?
-          
-          @indent -= 1 if sym == :opcodes_end
-          @indent = 0 if @indent < 0
-          
+
           op.instance_variable_set('@opcode', sym) if sym
           print_line op.inspect.gsub(/ElfMes::/, '')
         end
