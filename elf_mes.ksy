@@ -26,8 +26,8 @@ types:
       - id: next_std_char
         type: u1
         if: opcode >= 0x60 and opcode <= 0x7f
-      - id: op4
-        type: op4
+      - id: op_cmd4
+        type: op_cmd4
         if: opcode == 4
       - id: op6
         type: op6
@@ -101,7 +101,7 @@ types:
         0x2d: expr_const_operand
         0x2e: expr_const_stack
         0x2f: expr_random
-  op4:
+  op_cmd4:
     seq:
       - id: opcode
         type: u1
