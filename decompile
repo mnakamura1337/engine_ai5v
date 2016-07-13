@@ -1,0 +1,161 @@
+#!/usr/bin/env ruby
+
+require 'pp'
+
+require_relative 'elf_mes'
+
+class Decompiler
+  class BaseVar
+    attr_reader :n
+    def initialize(n)
+      @n = n
+    end
+
+    def to_s
+      "v#{@n}"
+    end
+
+    def inspect; to_s; end      
+  end
+
+  def initialize(fn)
+    @mes = ElfMes.from_file(fn)
+    @mes._read
+
+    @indent = 0
+    @str = ''
+    @stack = []
+  end
+
+  def run
+    @mes.ops.each { |op|
+      
+      sym = ElfMes::Op::OPCODES[op.opcode]
+      @cur_addr = op._debug['opcode'][:start]
+
+      if op.opcode >= 0x80 and op.str_char1
+        @str << op.str_char1.encode('UTF-8')
+      elsif op.next_std_char
+        a = [op.opcode + 0x20, op.next_std_char].pack('C*')
+        begin
+          @str << a.force_encoding('SJIS').encode('UTF-8')
+        rescue Encoding::InvalidByteSequenceError
+          @str << '?'
+        rescue Encoding::UndefinedConversionError
+          @str << '?'
+        end
+      else
+        dump_str
+        if op.opcode >= 0x20 and op.opcode <= 0x2f
+          @stack << sym.to_s.gsub(/^opcodes_expr_/, '')
+        elsif op.opcode >= 0x30 and op.opcode <= 0x3f
+          @stack << op.simple_const
+        elsif op.opcode >= 0x40 and op.opcode <= 0x5a
+          @stack << BaseVar.new(op.base_var)
+        elsif op.opcode == 7
+          r = op.b1 >> 2
+          @stack << r
+        elsif op.opcode == 8
+          r = op.b1 >> 2
+          r = ((r << 8) | op.b2) >> 2
+          @stack << r
+        elsif op.opcode == 9
+          @stack << op
+        elsif sym == :opcodes_cmd6
+          print op.op6.str.inspect
+        elsif sym == :opcodes_expr_end
+          st = dump_stack
+          print ' '
+          print st
+        elsif sym == :opcodes_comma
+          print ', '
+        elsif sym == :opcodes_begin
+          print ' {'
+          @indent += 1 if sym == :opcodes_begin    
+        else
+          st = dump_stack
+          print " #{st} !!!" unless st.nil?
+          
+          @indent -= 1 if sym == :opcodes_end
+          @indent = 0 if @indent < 0
+          
+          op.instance_variable_set('@opcode', sym) if sym
+          print_line op.inspect.gsub(/ElfMes::/, '')
+        end
+      end
+    }
+    dump_str
+  end
+
+  INDENT_STR = '    '
+
+  def print_line(s)
+#    printf "\n%08x: %s%s ", @cur_addr, '    ' * @indent, s
+    printf "\n%8s: %s%s ", '', INDENT_STR * @indent, s
+  end
+
+  def dump_stack2
+    return nil if @stack.empty?
+    
+    r = []
+    @stack.each { |el|
+      if el.is_a?(Fixnum)
+        r << el
+      elsif el.is_a?(BaseVar)
+        r << el.to_s
+      else
+        op_str = case el.to_s
+        when 'add' then '+'
+        else el.to_s
+        end
+          
+        a1 = r.pop
+        a2 = r.pop
+        r << "(#{a1} #{op_str} #{a2})"
+      end
+    }
+
+    raise "Unable to unstack #{@stack.inspect}, got #{r.inspect}" unless r.size == 1
+    @stack = []
+    r[0]
+  end
+
+  def dump_stack
+    return nil if @stack.empty?
+    s = @stack.inspect
+    @stack = []
+    s
+  end
+
+  def dump_str
+    unless @str.empty?
+      printf "\n%8s: %s%s", '', INDENT_STR * @indent, @str.inspect
+      @str = ''
+    end
+  end
+
+  def args_to_str(a)
+    # Borrowed from Kaitai::Struct::Struct.inspect
+
+    vars = []
+    a.instance_variables.each { |nsym|
+      nstr = nsym.to_s
+      next if nstr[0..1] == '@_'
+      nstr = nstr[1..-1]
+
+      nvalue = a.instance_variable_get(nsym)
+      nvalue = nvalue.inspect
+      vars << "#{nstr}=#{nvalue}"
+    }
+    "(#{vars.join(' ')})"
+  end
+end
+
+if ARGV.size == 0
+  puts "Usage: decompile [file.MES]..."
+  exit 1
+end
+
+ARGV.each { |fn|
+  Decompiler.new(fn).run
+}
