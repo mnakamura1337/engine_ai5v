@@ -15,7 +15,7 @@ class Decompiler
       "v#{@n}"
     end
 
-    def inspect; to_s; end      
+    def inspect; to_s; end
   end
 
   def initialize(fn)
@@ -29,7 +29,7 @@ class Decompiler
 
   def run
     @mes.ops.each { |op|
-      
+
       sym = ElfMes::Op::OPCODES[op.opcode]
       @cur_addr = op._debug['opcode'][:start]
 
@@ -74,18 +74,36 @@ class Decompiler
           @indent += 1 if sym == :opcodes_begin
         elsif sym == :opcodes_end
           @indent -= 1 if sym == :opcodes_end
-          @indent = 0 if @indent < 0          
+          @indent = 0 if @indent < 0
           print_line '}'
+        elsif sym == :opcodes_cmd4
+          real_op = op.op_cmd4
+          dump_op(real_op, real_op.opcode)
         else
-          st = dump_stack
-          print " #{st} !!!" unless st.nil?
-
-          op.instance_variable_set('@opcode', sym) if sym
-          print_line op.inspect.gsub(/ElfMes::/, '')
+          dump_op(op, sym)
         end
       end
     }
     dump_str
+  end
+
+  def dump_op(op, sym)
+    # Ensure that we don't have anything lingering on stack -
+    # everything should be properly consumed by "expr_end" stuff
+    # already, but do the check just in case.
+    st = dump_stack
+    print " #{st} !!!" unless st.nil?
+
+    op_name = sym.to_s.gsub(/^opcodes_/, '')
+    meth_name = "op_#{op_name}"
+    if op.respond_to?(meth_name)
+      op_specific = op.send(meth_name)
+      op_specific = args_to_str(op_specific)
+    else
+      op_specific = ''
+    end
+
+    print_line "#{op_name}#{op_specific}"
   end
 
   INDENT_STR = '    '
@@ -97,7 +115,7 @@ class Decompiler
 
   def dump_stack2
     return nil if @stack.empty?
-    
+
     r = []
     @stack.each { |el|
       if el.is_a?(Fixnum)
@@ -107,9 +125,13 @@ class Decompiler
       else
         op_str = case el.to_s
         when 'add' then '+'
+        when 'sub' then '+'
+        when 'mul' then '*'
+        when 'eq' then '=='
+        when 'ne' then '!='
         else el.to_s
         end
-          
+
         a1 = r.pop
         a2 = r.pop
         r << "(#{a1} #{op_str} #{a2})"
