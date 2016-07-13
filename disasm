@@ -9,11 +9,12 @@ class Disassembler
     @mes = ElfMes.from_file(fn)
     @mes._read
     @str = ''
+    @indent = 0
   end
 
   def run
     @mes.ops.each { |op|
-      addr = op._debug['opcode'][:start]
+      @cur_addr = op._debug['opcode'][:start]
       if op.opcode >= 0x80 and op.str_char1
         @str << op.str_char1.encode('UTF-8')
       elsif op.next_std_char
@@ -25,15 +26,34 @@ class Disassembler
         rescue Encoding::UndefinedConversionError
           @str << '?'
         end
+      elsif op.opcode >= 0x30 and op.opcode <= 0x3f
+        print_line "const(#{op.simple_const})"
+      elsif op.opcode >= 0x40 and op.opcode <= 0x5a
+        print_line "base_var(#{op.base_var})"
+      elsif op.opcode == 7
+        r = op.b1 >> 2
+        print_line "const_1op(#{r})"
+      elsif op.opcode == 8
+        r = op.b1 >> 2
+        r = ((r << 8) | op.b2) >> 2
+        print_line "const_2op(#{r})"
       else
-        dump_str
-        printf "%08x: ", addr
         sym = ElfMes::Op::OPCODES[op.opcode]
+
+        @indent -= 1 if sym == :opcodes_end
+
         op.instance_variable_set('@opcode', sym) if sym
-        pp op
+        print_line op.inspect.gsub(/ElfMes::/, '')
+
+        @indent += 1 if sym == :opcodes_begin
       end
     }
     dump_str
+  end
+
+  def print_line(s)
+    dump_str
+    printf "%08x: %s%s\n", @cur_addr, '    ' * @indent, s
   end
 
   def dump_str
